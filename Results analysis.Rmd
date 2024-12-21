@@ -1,0 +1,2231 @@
+---
+title: "Beyond Stories: Exploring the Influence of Emotional Indicators on the Subjective Quality Rating of Stories"
+subtitle: "Results analysis"
+author: "Rachel Ferati"
+date: "`r Sys.Date()`"
+output: 
+  github_document:
+    toc: true
+    toc_depth: 2
+---
+
+\newpage
+
+# Results dataset
+
+#### Libraries
+
+```{r, message=FALSE, warning=FALSE}
+library(readr)
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(kableExtra)
+library(knitr)
+library(tinytex)
+library(ggcorrplot)
+library(corrplot)
+library(Hmisc)
+library(tidyverse)
+library(lme4)
+library(psych)
+library(sjPlot)
+```
+
+#### Set options
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width=8, fig.height=5, fig.align='center')
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Data organization
+
+### Importation and cleaning
+
+#### Import dataset from Qualtrics
+
+```{r, message=FALSE, warning=FALSE}
+Data_raw <- read_csv("Data_raw.csv")
+View(Data_raw)
+```
+
+#### Remove 2 first lines of the dataset
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_large <- Data_raw[-c(1, 2), ]
+View(Data_clear_large)
+```
+
+#### Add Category (high or low) to the large table
+
+#### Define prefixes for high and low stories
+
+```{r, message=FALSE, warning=FALSE}
+high_prefixes <- c("BEJEDI08", "MAANAU12", "SADJSO02", "SAERBE09")
+low_prefixes <- c("VEYVEM11", "CLCHJO01", "ANJETI02", "COHEIG03")
+
+Data_clear_large <- Data_clear_large %>%
+  rename_with(~ paste0("high_",.), starts_with(high_prefixes)) %>% 
+  rename_with(~ paste0("low_",.), starts_with(low_prefixes))
+
+head(Data_clear_large)
+View(Data_clear_large)
+```
+
+#### Define prefixes and suffixes for high and low stories for exploratory questions
+
+```{r, message=FALSE, warning=FALSE}
+high_exploratory_prefixes <- c("high_BEJEDI08_L", "high_MAANAU12_L", "high_SADJSO02_L", "high_SAERBE09_L")
+low_exploratory_prefixes <- c("low_VEYVEM11_L", "low_CLCHJO01_L", "low_ANJETI02_L", "low_COHEIG03_L")
+
+Data_clear_large <- Data_clear_large %>%
+  rename_with(~ paste0("exp_", .), starts_with(high_exploratory_prefixes)) %>% 
+  rename_with(~ paste0("exp_", .), starts_with(low_exploratory_prefixes))
+
+head(Data_clear_large)
+View(Data_clear_large)
+```
+
+```{r, message=FALSE, warning=FALSE}
+high_exploratory_prefixes <- c("exp_high_BEJEDI08_L", "exp_high_MAANAU12_L", "exp_high_SADJSO02_L", "exp_high_SAERBE09_L")
+low_exploratory_prefixes <- c("exp_low_VEYVEM11_L", "exp_low_CLCHJO01_L", "exp_low_ANJETI02_L", "exp_low_COHEIG03_L")
+
+Data_clear_large <- Data_clear_large %>%
+  rename_with(~ paste0(.,"_high"), starts_with(high_exploratory_prefixes)) %>% 
+  rename_with(~ paste0(.,"_low"), starts_with(low_exploratory_prefixes))
+
+head(Data_clear_large)
+View(Data_clear_large)
+```
+
+---
+
+### Long table
+
+#### Convert from wide to long in Data_clear based on high and low stories
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long <- pivot_longer(
+  Data_clear_large, 
+  cols = starts_with(c("high_", "low_")),
+  names_to = "Stories",
+  values_to = "Grades"
+)
+```
+
+#### Move "Stories" and "Grades" to the first two columns
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long <- Data_clear_long %>%
+  select(Stories, Grades, everything())
+
+print(Data_clear_long)
+View(Data_clear_long)
+```
+
+#### Add the column "Category" to the dataset
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long <- Data_clear_long %>%
+  mutate(
+    Category = case_when(
+      grepl("^(high_BEJEDI08|high_MAANAU12|high_SADJSO02|high_SAERBE09)", Stories) ~ "high",
+      grepl("^(low_VEYVEM11|low_CLCHJO01|low_ANJETI02|low_COHEIG03)", Stories) ~ "low",
+    )
+  )%>%
+  select(1:2, Category, everything())  # Moves Category to the 3rd position
+
+Data_clear_long$Category<- as.factor(Data_clear_long$Category)
+
+View(Data_clear_long)
+```
+
+---
+
+### Exclusion of participants
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_large <- Data_clear_large %>%
+  filter(Attention == 3)
+```
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long <- Data_clear_long %>%
+  filter(Attention == 3)
+```
+
+\newpage
+
+## 2. Mean and SD of the dataset
+
+#### Convert columns in Data_clear_large to numeric
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_large[, 12:84] <- lapply(Data_clear_large[, 12:84], function(x) as.numeric(as.character(x)))
+```
+
+---
+
+### AGE
+
+```{r, message=FALSE, warning=FALSE}
+summary(Data_clear_large$Age)
+sum(is.na(Data_clear_large$Age))
+```
+
+#### Calculate Mean and SD for AGE
+
+```{r, message=FALSE, warning=FALSE}
+mean_age <- mean(Data_clear_large$Age, na.rm = TRUE)
+sd_age <- sd(Data_clear_large$Age, na.rm = TRUE)
+
+cat("Mean Age:", mean_age, "\n")
+cat("Standard Deviation of Age:", sd_age, "\n")
+```
+
+#### Frequency distribution of Age
+
+```{r, message=FALSE, warning=FALSE}
+age_distribution <- table(Data_clear_large$Age)
+print(age_distribution)
+```
+
+#### Percentage of Age
+
+```{r, message=FALSE, warning=FALSE}
+frequency_table_age <- table(Data_clear_large$Age)
+
+percentage_table_age <- prop.table(frequency_table_age) * 100
+
+percentage_age_df <- as.data.frame(percentage_table_age)
+colnames(percentage_age_df) <- c("Age", "Percentage")
+
+print(percentage_age_df)
+```
+
+#### Visual of Age distribution in the dataset
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(Data_clear_large, aes(x = Age)) +
+  geom_histogram(fill = "skyblue", color = "black") +
+  labs(title = "Age Distribution", x = "Age", y = "Number of participants") +
+  theme_minimal()
+```
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(Data_clear_large, aes(x = Age)) +
+  geom_density(fill = "skyblue", alpha = 0.5) +
+  labs(title = "Age Density Distribution", x = "Age", y = "Density") +
+  theme_minimal()
+```
+
+---
+
+### GENDER
+
+```{r, message=FALSE, warning=FALSE}
+summary(Data_clear_large$Genre)
+sum(is.na(Data_clear_large$Genre))
+```
+
+#### Calculate Mean and SD of Genre
+
+```{r, message=FALSE, warning=FALSE}
+mean_genre <- mean(Data_clear_large$Genre, na.rm = TRUE)
+sd_genre <- sd(Data_clear_large$Genre, na.rm = TRUE)
+
+cat("Mean Genre:", mean_genre, "\n")
+cat("Standard Deviation of Genre:", sd_genre, "\n")
+```
+
+#### Frequency distribution of Genre
+
+```{r, message=FALSE, warning=FALSE}
+genre_distribution <- table(Data_clear_large$Genre)
+
+print(genre_distribution)
+```
+
+#### Percentage of Gender
+
+```{r, message=FALSE, warning=FALSE}
+frequency_table_gender <- table(Data_clear_large$Genre)
+
+percentage_table_gender <- prop.table(frequency_table_gender) * 100
+
+percentage_gender_df <- as.data.frame(percentage_table_gender)
+colnames(percentage_gender_df) <- c("Gender", "Percentage")
+
+print(percentage_gender_df)
+```
+
+#### Visual of Gender distribution in the dataset
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(Data_clear_large, aes(x = factor(Genre), y = (..count..)/sum(..count..), fill = factor(Genre))) +
+  geom_bar() +
+  scale_y_continuous(labels = scales::percent_format()) +
+  scale_fill_manual(values = c("1" = "lightgoldenrod1", "2" = "lightblue1", "3" = "lightsalmon"),
+                    labels = c("Female", "Male", "Non-binary")) + 
+  labs(title = "Gender Distribution", x = "Gender", y = "Percentage") +
+  scale_x_discrete(labels = c("1" = "Female", "2" = "Male", "3" = "Non-binary")) +
+  theme_minimal()
+```
+
+---
+
+### EDUCATION
+
+```{r, message=FALSE, warning=FALSE}
+summary(Data_clear_large$Education)
+```
+
+#### Calculate Mean and SD of Education
+
+```{r, message=FALSE, warning=FALSE}
+mean_education <- mean(Data_clear_large$Education, na.rm = TRUE)
+sd_education <- sd(Data_clear_large$Education, na.rm = TRUE)
+
+cat("Mean Education:", mean_education, "\n")
+cat("Standard Deviation of Education:", sd_education, "\n")
+```
+
+#### Frequency distribution of Education
+
+```{r, message=FALSE, warning=FALSE}
+education_distribution <- table(Data_clear_large$Education)
+
+print(education_distribution)
+```
+
+#### Percentage of Education
+
+```{r, message=FALSE, warning=FALSE}
+frequency_table_education <- table(Data_clear_large$Education)
+
+percentage_table_education <- prop.table(frequency_table_education) * 100
+
+percentage_education_df <- as.data.frame(percentage_table_education)
+colnames(percentage_education_df) <- c("Level of Education", "Percentage")
+
+print(percentage_education_df)
+```
+
+#### Visual of Education distribution in the dataset
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(Data_clear_large, aes(x = factor(Education), fill = factor(Education))) +
+  geom_bar() +
+  scale_y_continuous(breaks = seq(1, 8, by = 1), limits = c(0, 8)) +
+  scale_fill_manual(values = c("1" = "lightgoldenrod1", "2" = "lightblue1", "3" = "brown3", "4" = "red", "5" = "orange", "6" = "blue", "7" = "lightgoldenrod1", "8" = "lightpink"),
+                    labels = c("High school", "Professional","Bachelor", "Master", "Else")) +
+  scale_x_discrete(labels = c("1" = "Secondary", "2" = "High school", "3" = "Professional", "4" = "Federal", "5" = "Bachelor", "7" = "Master", "8" = "Else")) +
+  labs(title = "Education Level Distribution", x = "Education Level", y = "Number of participants", fill = "Education") +
+  theme_minimal()
+```
+
+---
+
+### SIMILAR LIVING EXPERIENCE (Vie)
+
+```{r, message=FALSE, warning=FALSE}
+summary(Data_clear_large$Vie)
+```
+
+#### Calculate Mean and SD of Vie
+
+```{r, message=FALSE, warning=FALSE}
+mean_vie <- mean(Data_clear_large$Vie, na.rm = TRUE)
+sd_vie <- sd(Data_clear_large$Vie, na.rm = TRUE)
+
+cat("Mean Vie:", mean_vie, "\n")
+cat("Standard Deviation of Vie:", sd_vie, "\n")
+```
+
+#### Frequency distribution of Vie
+
+```{r, message=FALSE, warning=FALSE}
+vie_distribution <- table(Data_clear_large$Vie)
+
+print(vie_distribution)
+```
+
+#### Percentage of Similar living experience
+
+```{r, message=FALSE, warning=FALSE}
+frequency_table_vie <- table(Data_clear_large$Vie)
+
+percentage_table_vie <- prop.table(frequency_table_vie) * 100
+
+percentage_vie_df <- as.data.frame(percentage_table_vie)
+colnames(percentage_vie_df) <- c("Similar living experience", "Percentage")
+
+print(percentage_vie_df)
+```
+
+#### Visual of Vie distribution in the dataset
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(Data_clear_large, aes(x = factor(Vie), fill = factor(Vie))) +
+  geom_bar() +
+  scale_fill_manual(values = c("1" = "lightcoral", "2" = "lightblue1"),
+                    labels = c("Yes", "No")) +
+  labs(title = "Similar Life Experience Distribution", x = "Vie", y = "Number of participants") +
+  scale_x_discrete(labels = c("1" = "Yes", "2" = "No")) +
+  theme_minimal()
+```
+
+---
+
+### PARTICIPATION
+
+```{r, message=FALSE, warning=FALSE}
+summary(Data_clear_large$Participation)
+```
+
+#### Calculate Mean and SD of Participation
+
+```{r, message=FALSE, warning=FALSE}
+mean_participation <- mean(Data_clear_large$Participation, na.rm = TRUE)
+sd_participation <- sd(Data_clear_large$Participation, na.rm = TRUE)
+
+cat("Mean Participation:", mean_participation, "\n")
+cat("Standard Deviation of Participation:", sd_participation, "\n")
+```
+
+#### Frequency distribution of Participation
+
+```{r, message=FALSE, warning=FALSE}
+participation_distribution <- table(Data_clear_large$Participation)
+
+print(participation_distribution)
+```
+
+#### Percentage of participation in the previous experiment
+
+```{r, message=FALSE, warning=FALSE}
+frequency_table_participation <- table(Data_clear_large$Participation)
+
+percentage_table_participation <- prop.table(frequency_table_participation) * 100
+
+percentage_participation_df <- as.data.frame(percentage_table_participation)
+colnames(percentage_participation_df) <- c("Participation in previous experiment", "Percentage")
+
+print(percentage_participation_df)
+```
+
+#### Visual of Participation distribution in the dataset
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(Data_clear_large, aes(x = factor(Participation), fill = factor(Participation))) +
+  geom_bar() +
+  scale_fill_manual(values = c("1" = "lightcoral", "2" = "lightblue1"),
+                    labels = c("Yes", "No")) +
+  labs(title = "Previous Participation Distribution", x = "Participation", y = "Number of participants") +
+  scale_x_discrete(labels = c("1" = "Yes", "2" = "No")) +
+  theme_minimal()
+```
+
+---
+
+### HABITS
+
+#### Habits - BOOKS
+
+```{r, message=FALSE, warning=FALSE}
+summary(Data_clear_large$Habitudes_1)
+```
+
+#### Calculate mean and SD of Habits for books
+
+```{r, message=FALSE, warning=FALSE}
+mean_habits_books <- mean(Data_clear_large$Habitudes_1, na.rm = TRUE)
+sd_habits_books <- sd(Data_clear_large$Habitudes_1, na.rm = TRUE)
+
+cat("Mean Books habits:", mean_habits_books, "\n")
+cat("Standard Deviation of Books habits:", sd_habits_books, "\n")
+```
+
+#### Frequency distribution habits of books
+
+```{r, message=FALSE, warning=FALSE}
+habits_books_distribution <- table(Data_clear_large$Habitudes_1)
+
+print(habits_books_distribution)
+```
+
+#### Percentage of books habits
+
+```{r, message=FALSE, warning=FALSE}
+frequency_table_books <- table(Data_clear_large$Habitudes_1)
+
+percentage_table_books <- prop.table(frequency_table_books) * 100
+
+percentage_books_df <- as.data.frame(percentage_table_books)
+colnames(percentage_books_df) <- c("Grade", "Percentage")
+
+print(percentage_books_df)
+```
+
+#### Visual of Books habits distribution in the dataset
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(Data_clear_large, aes(x = factor(Habitudes_1), fill = factor(Habitudes_1))) +
+  geom_bar() +
+  scale_fill_manual(values = c("1" = "lightgoldenrod1", "2" = "lightblue1", "3" = "brown3", "4" = "lightseagreen", "5" = "orange", "6" = "lightpink"),
+                    labels = c("Never", "Once a month", "Multiple times a month", "Once a week", "Multiple times a week", "Everyday")) +
+  scale_x_discrete(labels = c("1" = "Never", "2" = "Once a month", "3" = "Multiple times a month", "4" = "Once a week", "5" = "Multiple times a week", "6" = "Everyday")) +
+  labs(title = "Frequency of Reading Habits Grades", x = "Book habits grade", y = "Number of participants") +
+  theme_minimal()
+```
+
+---
+
+#### Habits - AUDIOBOOKS
+
+```{r, message=FALSE, warning=FALSE}
+summary(Data_clear_large$Habitudes_2)
+```
+
+#### Calculate mean and SD of Habits for audiobooks/podcasts
+
+```{r, message=FALSE, warning=FALSE}
+mean_habits_audiobooks <- mean(Data_clear_large$Habitudes_2, na.rm = TRUE)
+sd_habits_audiobooks <- sd(Data_clear_large$Habitudes_2, na.rm = TRUE)
+
+cat("Mean Audiobooks habits:", mean_habits_audiobooks, "\n")
+cat("Standard Deviation of Audiobooks habits:", sd_habits_audiobooks, "\n")
+```
+
+#### Frequency distribution habits of audiobooks
+
+```{r, message=FALSE, warning=FALSE}
+habits_audiobooks_distribution <- table(Data_clear_large$Habitudes_2)
+
+print(habits_audiobooks_distribution)
+```
+
+#### Percentage of audiobooks habits
+
+```{r, message=FALSE, warning=FALSE}
+frequency_table_audiobooks <- table(Data_clear_large$Habitudes_2)
+
+percentage_table_audiobooks <- prop.table(frequency_table_audiobooks) * 100
+
+percentage_audiobooks_df <- as.data.frame(percentage_table_audiobooks)
+colnames(percentage_audiobooks_df) <- c("Grade", "Percentage")
+
+print(percentage_audiobooks_df)
+```
+
+#### Visual of audiobooks habits distribution in the dataset
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(Data_clear_large, aes(x = factor(Habitudes_2), fill = factor(Habitudes_2))) +
+  geom_bar() +
+    scale_fill_manual(values = c("1" = "lightgoldenrod1", "2" = "lightblue1", "3" = "brown3", "4" = "lightseagreen", "5" = "orange", "6" = "lightpink"),
+                    labels = c("Never", "Once a month", "Multiple times a month", "Once a week", "Multiple times a week", "Everyday")) +
+  scale_x_discrete(labels = c("1" = "Never", "2" = "Once a month", "3" = "Multiple times a month", "4" = "Once a week", "5" = "Multiple times a week", "6" = "Everyday")) +
+  labs(title = "Frequency of Audiobooks/podcasts Habits Grades", x = "Audioooks/podcasts habits grade", y = "Number of participants") +
+  theme_minimal()
+```
+
+---
+
+#### Habits - TELEVISION
+
+```{r, message=FALSE, warning=FALSE}
+summary(Data_clear_large$Habitudes_3)
+```
+
+#### Calculate mean and SD of Habits for television
+
+```{r, message=FALSE, warning=FALSE}
+mean_habits_television <- mean(Data_clear_large$Habitudes_3, na.rm = TRUE)
+sd_habits_television <- sd(Data_clear_large$Habitudes_3, na.rm = TRUE)
+
+cat("Mean television habits:", mean_habits_television, "\n")
+cat("Standard Deviation of television habits:", sd_habits_television, "\n")
+```
+
+#### Frequency distribution habits of television
+
+```{r, message=FALSE, warning=FALSE}
+habits_television_distribution <- table(Data_clear_large$Habitudes_3)
+
+print(habits_television_distribution)
+```
+
+#### Percentage of television habits
+
+```{r, message=FALSE, warning=FALSE}
+frequency_table_television <- table(Data_clear_large$Habitudes_3)
+
+percentage_table_television <- prop.table(frequency_table_television) * 100
+
+percentage_television_df <- as.data.frame(percentage_table_television)
+colnames(percentage_television_df) <- c("Grade", "Percentage")
+
+print(percentage_television_df)
+```
+
+#### Visual of television habits distribution in the dataset
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(Data_clear_large, aes(x = factor(Habitudes_3), fill = factor(Habitudes_3))) +
+  geom_bar() +
+  scale_fill_manual(values = c("3" = "brown3", "4" = "lightseagreen", "5" = "orange", "6" = "lightpink"),
+                    labels = c("Multiple times a month", "Once a week", "Multiple times a week", "Everyday")) +
+  scale_x_discrete(labels = c("1" = "Never", "2" = "Once a month", "3" = "Multiple times a month", "4" = "Once a week", "5" = "Multiple times a week", "6" = "Everyday")) +
+  labs(title = "Frequency of Watching Television Habits Grades", x = "Television habits grade", y = "Nb of participants") +
+  theme_minimal()
+```
+
+---
+
+#### Habits - SOCIALMEDIA
+
+```{r, message=FALSE, warning=FALSE}
+summary(Data_clear_large$Habitudes_4)
+```
+
+#### Calculate mean and SD of Habits for social media
+
+```{r, message=FALSE, warning=FALSE}
+mean_habits_socialmedia <- mean(Data_clear_large$Habitudes_4, na.rm = TRUE)
+sd_habits_socialmedia <- sd(Data_clear_large$Habitudes_4, na.rm = TRUE)
+
+cat("Mean socialmedia habits:", mean_habits_socialmedia, "\n")
+cat("Standard Deviation of socialmedia habits:", sd_habits_socialmedia, "\n")
+```
+
+#### Frequency distribution habits of television
+
+```{r, message=FALSE, warning=FALSE}
+habits_socialmedia_distribution <- table(Data_clear_large$Habitudes_4)
+
+print(habits_socialmedia_distribution)
+```
+
+#### Percentage of television habits
+
+```{r, message=FALSE, warning=FALSE}
+frequency_table_socialmedia <- table(Data_clear_large$Habitudes_4)
+
+percentage_table_socialmedia <- prop.table(frequency_table_socialmedia) * 100
+
+percentage_socialmedia_df <- as.data.frame(percentage_table_socialmedia)
+colnames(percentage_socialmedia_df) <- c("Grade", "Percentage")
+
+print(percentage_socialmedia_df)
+```
+
+#### Visual of socialmedia habits distribution in the dataset
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(Data_clear_large, aes(x = factor(Habitudes_4), fill = factor(Habitudes_4))) +
+  geom_bar() +
+  scale_fill_manual(values = c("2" = "lightblue1", "3" = "brown3", "5" = "orange", "6" = "lightpink"),
+                    labels = c("Once a month", "Multiple times a month", "Multiple times a week", "Everyday")) +
+  scale_x_discrete(labels = c("1" = "Never", "2" = "Once a month", "3" = "Multiple times a month", "4" = "Once a week", "5" = "Multiple times a week", "6" = "Everyday")) +
+  labs(title = "Frequency of Social media Habit Grades", x = "Social media habits grade", y = "Nb of participants") +
+  theme_minimal()
+```
+
+---
+
+#### Habits - VIDEO GAMES
+
+```{r, message=FALSE, warning=FALSE}
+summary(Data_clear_large$Habitudes_5)
+```
+
+#### Calculate mean and SD of Habits for video games
+
+```{r, message=FALSE, warning=FALSE}
+mean_habits_videogames <- mean(Data_clear_large$Habitudes_5, na.rm = TRUE)
+sd_habits_videogames <- sd(Data_clear_large$Habitudes_5, na.rm = TRUE)
+
+cat("Mean videogames habits:", mean_habits_videogames, "\n")
+cat("Standard Deviation of videogames habits:", sd_habits_videogames, "\n")
+```
+
+#### Frequency distribution habits of video games
+
+```{r, message=FALSE, warning=FALSE}
+habits_videogames_distribution <- table(Data_clear_large$Habitudes_5)
+
+print(habits_videogames_distribution)
+```
+
+#### Percentage of television habits
+
+```{r, message=FALSE, warning=FALSE}
+frequency_table_videogames <- table(Data_clear_large$Habitudes_5)
+
+percentage_table_videogames <- prop.table(frequency_table_videogames) * 100
+
+percentage_videogames_df <- as.data.frame(percentage_table_videogames)
+colnames(percentage_videogames_df) <- c("Grade", "Percentage")
+
+print(percentage_videogames_df)
+```
+
+#### Visual of videogames habits distribution in the dataset
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(Data_clear_large, aes(x = factor(Habitudes_5), fill = factor(Habitudes_5))) +
+  geom_bar() +
+  scale_fill_manual(values = c("1" = "lightgoldenrod1", "2" = "lightblue1", "3" = "brown3", "5" = "orange", "6" = "lightpink"),
+                    labels = c("Never", "Once a month", "Multiple times a month", "Multiple times a week", "Everyday")) +
+  scale_x_discrete(labels = c("1" = "Never", "2" = "Once a month", "3" = "Multiple times a month", "4" = "Once a week", "5" = "Multiple times a week", "6" = "Everyday")) +
+  labs(title = "Frequency of Video games Habit Grades", x = "Video games habits grade", y = "Nb of participants") +
+  theme_minimal()
+```
+
+---
+
+#### Habits - ORAL STORIES
+
+```{r, message=FALSE, warning=FALSE}
+summary(Data_clear_large$Habitudes_6)
+```
+
+#### Calculate mean and SD of Habits for Oral stories
+
+```{r, message=FALSE, warning=FALSE}
+mean_habits_oralstories <- mean(Data_clear_large$Habitudes_6, na.rm = TRUE)
+sd_habits_oralstories  <- sd(Data_clear_large$Habitudes_6, na.rm = TRUE)
+
+cat("Mean oralstories habits:", mean_habits_oralstories , "\n")
+cat("Standard Deviation of oralstories habits:", sd_habits_oralstories , "\n")
+```
+
+#### Frequency distribution habits of oral stories
+
+```{r, message=FALSE, warning=FALSE}
+habits_oralstories_distribution <- table(Data_clear_large$Habitudes_6)
+
+print(habits_oralstories_distribution)
+```
+
+#### Percentage of oral stories habits
+
+```{r, message=FALSE, warning=FALSE}
+frequency_table_oralstories <- table(Data_clear_large$Habitudes_6)
+
+percentage_table_oralstories <- prop.table(frequency_table_oralstories) * 100
+
+percentage_oralstories_df <- as.data.frame(percentage_table_oralstories)
+colnames(percentage_oralstories_df) <- c("Grade", "Percentage")
+
+print(percentage_oralstories_df)
+```
+
+#### Visual of oralstories habits distribution in the dataset
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(Data_clear_large, aes(x = factor(Habitudes_6), fill = factor(Habitudes_6))) +
+  geom_bar() +
+  scale_fill_manual(values = c("1" = "lightgoldenrod1", "2" = "lightblue1", "3" = "brown3", "4" = "lightseagreen", "5" = "orange", "6" = "lightpink"),
+                    labels = c("Never", "Once a month", "Multiple times a month", "Once a week", "Multiple times a week", "Everyday")) +
+  scale_x_discrete(labels = c("1" = "Never", "2" = "Once a month", "3" = "Multiple times a month", "4" = "Once a week", "5" = "Multiple times a week", "6" = "Everyday")) +
+  labs(title = "Frequency of Oral stories Habit Grades", x = "Oral stories habits grade", y = "Nb of participants") +
+  theme_minimal()
+```
+
+---
+
+### STORIES WITH HIGH GRANULARITY
+
+#### Select columns that start with "high_" and convert to numeric
+
+```{r, message=FALSE, warning=FALSE}
+stories_high <- Data_clear_large %>%
+  select(starts_with("high_")) %>%
+  mutate(across(everything(), ~ as.numeric(as.character(.))))
+```
+
+#### Check for any NA values introduced by coercion
+
+```{r, message=FALSE, warning=FALSE}
+na_count <- sum(is.na(stories_high))
+if (na_count > 0) {
+  cat("Warning: NA values were introduced during conversion. Count:", na_count, "\n")
+}
+```
+
+#### Calculate mean and SD for each column starting with "high_" (for high Stories)
+
+```{r, message=FALSE, warning=FALSE}
+mean_values <- colMeans(stories_high, na.rm = TRUE)
+sd_values <- apply(stories_high, 2, sd, na.rm = TRUE)
+```
+
+#### Combine the results into a data frame for better readability
+
+```{r, message=FALSE, warning=FALSE}
+results_high_stories <- data.frame(
+  Column = names(mean_values),
+  Mean = mean_values,
+  SD = sd_values
+)
+
+print(results_high_stories)
+View(results_high_stories)
+```
+
+---
+
+### STORIES WITH HIGH GRANULARITY OVERALL
+
+#### Calculate overall mean and standard deviation for high stories across all participants
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_large[, grep("^high_", names(Data_clear_large))] <- 
+  lapply(Data_clear_large[, grep("^high_", names(Data_clear_large))], 
+         function(x) as.numeric(as.character(x)))
+
+
+Overall_Mean_Grade <- mean(unlist(Data_clear_large[, grep("^high_", names(Data_clear_large))]), na.rm = TRUE)
+Overall_SD_Grade <- sd(unlist(Data_clear_large[, grep("^high_", names(Data_clear_large))]), na.rm = TRUE)
+
+
+overall_results_high_stories <- list(
+  Overall_Mean_Grade = Overall_Mean_Grade,
+  Overall_SD_Grade = Overall_SD_Grade
+)
+
+print(overall_results_high_stories)
+```
+
+---
+
+### STORIES WITH LOW GRANULARITY
+
+#### Select columns that starts with "low_" and convert to numeric
+
+```{r, message=FALSE, warning=FALSE}
+stories_low <- Data_clear_large %>%
+  select(starts_with("low_")) %>%
+  mutate(across(everything(), ~ as.numeric(as.character(.))))
+```
+
+#### Check for any NA values introduced by coercion
+
+```{r, message=FALSE, warning=FALSE}
+na_count <- sum(is.na(stories_low))
+if (na_count > 0) {
+  cat("Warning: NA values were introduced during conversion. Count:", na_count, "\n")
+}
+```
+
+#### Calculate mean and SD for each column starting with "low_" (for low Stories)
+
+```{r, message=FALSE, warning=FALSE}
+mean_values <- colMeans(stories_low, na.rm = TRUE)
+sd_values <- apply(stories_low, 2, sd, na.rm = TRUE)
+```
+
+#### Combine the results into a data frame for better readability
+
+```{r, message=FALSE, warning=FALSE}
+results_low_stories <- data.frame(
+  Column = names(mean_values),
+  Mean = mean_values,
+  SD = sd_values
+)
+
+print(results_low_stories)
+View(results_low_stories)
+```
+
+---
+
+### STORIES WITH LOW GRANULARITY OVERALL
+
+#### Calculate overall mean and standard deviation for low stories across all participants
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_large[, grep("^low_", names(Data_clear_large))] <- 
+  lapply(Data_clear_large[, grep("^low_", names(Data_clear_large))], 
+         function(x) as.numeric(as.character(x)))
+
+Overall_Mean_Grade_low <- mean(unlist(Data_clear_large[, grep("^low_", names(Data_clear_large))]), na.rm = TRUE)
+Overall_SD_Grade_low <- sd(unlist(Data_clear_large[, grep("^low_", names(Data_clear_large))]), na.rm = TRUE)
+
+overall_results_low_stories <- list(
+  Overall_Mean_Grade = Overall_Mean_Grade_low,
+  Overall_SD_Grade = Overall_SD_Grade_low
+)
+
+print(overall_results_low_stories)
+```
+
+---
+
+### STORIES HIGH GRANULARITY - Entertainment (_L_1_high)
+
+#### Select columns that end with "_L_1_high" and convert to numeric
+
+```{r, message=FALSE, warning=FALSE}
+stories_Entertainment_high <- Data_clear_large %>%
+  select(ends_with("_L_1_high")) %>%
+  mutate(across(everything(), ~ as.numeric(as.character(.))))
+```
+
+#### Check for any NA values introduced by coercion
+
+```{r, message=FALSE, warning=FALSE}
+na_count <- sum(is.na(stories_Entertainment_high))
+if (na_count > 0) {
+  cat("Warning: NA values were introduced during conversion. Count:", na_count, "\n")
+}
+```
+
+#### Calculate mean and SD for each column ending with "_L_1_high"
+
+```{r, message=FALSE, warning=FALSE}
+mean_values <- colMeans(stories_Entertainment_high, na.rm = TRUE)
+sd_values <- apply(stories_Entertainment_high, 2, sd, na.rm = TRUE)
+```
+
+#### Combine the results into a data frame for better readability
+
+```{r, message=FALSE, warning=FALSE}
+results_stories_Entertainment_high <- data.frame(
+  Column = names(mean_values),
+  Mean = mean_values,
+  SD = sd_values
+)
+
+print(results_stories_Entertainment_high)
+View(results_stories_Entertainment_high)
+```
+
+---
+
+### STORIES HIGH GRANULARITY - Entertainment (_L_1_high) OVERALL
+
+#### Calculate overall mean and standard deviation for Entertainment in high stories across all participants
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_large[, grep("_L_1_high$", names(Data_clear_large))] <- 
+  lapply(Data_clear_large[, grep("_L_1_high$", names(Data_clear_large))], 
+         function(x) as.numeric(as.character(x)))
+
+Overall_Mean_Grade_Entertainment_high <- mean(unlist(Data_clear_large[, grep("_L_1_high$", names(Data_clear_large))]), na.rm = TRUE)
+Overall_SD_Grade_Entertainment_high <- sd(unlist(Data_clear_large[, grep("_L_1_high$", names(Data_clear_large))]), na.rm = TRUE)
+
+overall_results_Entertainment_high <- list(
+  Overall_Mean_Grade = Overall_Mean_Grade_Entertainment_high,
+  Overall_SD_Grade = Overall_SD_Grade_Entertainment_high
+)
+
+print(overall_results_Entertainment_high)
+```
+
+---
+
+### STORIES HIGH GRANULARITY - Emotionality (_L_2_high)
+
+#### Select columns that end with "_L_2_high" and convert to numeric
+
+```{r, message=FALSE, warning=FALSE}
+stories_Emotionality_high <- Data_clear_large %>%
+  select(ends_with("_L_2_high")) %>%
+  mutate(across(everything(), ~ as.numeric(as.character(.))))
+```
+
+#### Check for any NA values introduced by coercion
+
+```{r, message=FALSE, warning=FALSE}
+na_count <- sum(is.na(stories_Emotionality_high))
+if (na_count > 0) {
+  cat("Warning: NA values were introduced during conversion. Count:", na_count, "\n")
+}
+```
+
+#### Calculate mean and SD for each column ending with "_L_2_high"
+
+```{r, message=FALSE, warning=FALSE}
+mean_values <- colMeans(stories_Emotionality_high, na.rm = TRUE)
+sd_values <- apply(stories_Emotionality_high, 2, sd, na.rm = TRUE)
+```
+
+#### Combine the results into a data frame for better readability
+
+```{r, message=FALSE, warning=FALSE}
+results_stories_Emotionality_high <- data.frame(
+  Column = names(mean_values),
+  Mean = mean_values,
+  SD = sd_values
+)
+
+print(results_stories_Emotionality_high)
+View(results_stories_Emotionality_high)
+```
+
+---
+
+### STORIES HIGH GRANULARITY - Emotionality (_L_2_high) OVERALL
+
+#### Calculate overall mean and standard deviation for Emotionality in high stories across all participants
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_large[, grep("_L_2_high$", names(Data_clear_large))] <- 
+  lapply(Data_clear_large[, grep("_L_2_high$", names(Data_clear_large))], 
+         function(x) as.numeric(as.character(x)))
+
+Overall_Mean_Grade_Emotionality_high <- mean(unlist(Data_clear_large[, grep("_L_2_high$", names(Data_clear_large))]), na.rm = TRUE)
+Overall_SD_Grade_Emotionality_high <- sd(unlist(Data_clear_large[, grep("_L_2_high$", names(Data_clear_large))]), na.rm = TRUE)
+
+overall_results_Emotionality_high <- list(
+  Overall_Mean_Grade = Overall_Mean_Grade_Emotionality_high,
+  Overall_SD_Grade = Overall_SD_Grade_Emotionality_high
+)
+
+print(overall_results_Emotionality_high)
+```
+
+---
+
+### STORIES HIGH GRANULARITY - Memorable (_L_3_high)
+
+#### Select columns that end with "_L_3_high" and convert to numeric
+
+```{r, message=FALSE, warning=FALSE}
+stories_Memorable_high <- Data_clear_large %>%
+  select(ends_with("_L_3_high")) %>%
+  mutate(across(everything(), ~ as.numeric(as.character(.))))
+```
+
+#### Check for any NA values introduced by coercion
+
+```{r, message=FALSE, warning=FALSE}
+na_count <- sum(is.na(stories_Memorable_high))
+if (na_count > 0) {
+  cat("Warning: NA values were introduced during conversion. Count:", na_count, "\n")
+}
+```
+
+#### Calculate mean and SD for each column ending with "_L_3_high"
+
+```{r, message=FALSE, warning=FALSE}
+mean_values <- colMeans(stories_Memorable_high, na.rm = TRUE)
+sd_values <- apply(stories_Memorable_high, 2, sd, na.rm = TRUE)
+```
+
+#### Combine the results into a data frame for better readability
+
+```{r, message=FALSE, warning=FALSE}
+results_stories_Memorable_high <- data.frame(
+  Column = names(mean_values),
+  Mean = mean_values,
+  SD = sd_values
+)
+
+print(results_stories_Memorable_high)
+View(results_stories_Memorable_high)
+```
+
+---
+
+### STORIES HIGH GRANULARITY - Memorable (_L_3_high) OVERALL
+
+#### Calculate overall mean and standard deviation for Memorable in high stories across all participants
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_large[, grep("_L_3_high$", names(Data_clear_large))] <- 
+  lapply(Data_clear_large[, grep("_L_3_high$", names(Data_clear_large))], 
+         function(x) as.numeric(as.character(x)))
+
+Overall_Mean_Grade_Memorable_high <- mean(unlist(Data_clear_large[, grep("_L_3_high$", names(Data_clear_large))]), na.rm = TRUE)
+Overall_SD_Grade_Memorable_high <- sd(unlist(Data_clear_large[, grep("_L_3_high$", names(Data_clear_large))]), na.rm = TRUE)
+
+overall_results_Memorable_high <- list(
+  Overall_Mean_Grade = Overall_Mean_Grade_Memorable_high,
+  Overall_SD_Grade = Overall_SD_Grade_Memorable_high
+)
+
+print(overall_results_Memorable_high)
+```
+
+---
+
+### STORIES HIGH GRANULARITY - Originality (_L_4_high)
+
+#### Select columns that end with "_L_4_high" and convert to numeric
+
+```{r, message=FALSE, warning=FALSE}
+stories_Originality_high <- Data_clear_large %>%
+  select(ends_with("_L_4_high")) %>%
+  mutate(across(everything(), ~ as.numeric(as.character(.))))
+```
+
+#### Check for any NA values introduced by coercion
+
+```{r, message=FALSE, warning=FALSE}
+na_count <- sum(is.na(stories_Originality_high))
+if (na_count > 0) {
+  cat("Warning: NA values were introduced during conversion. Count:", na_count, "\n")
+}
+```
+
+#### Calculate mean and SD for each column ending with "_L_4_high"
+
+```{r, message=FALSE, warning=FALSE}
+mean_values <- colMeans(stories_Originality_high, na.rm = TRUE)
+sd_values <- apply(stories_Originality_high, 2, sd, na.rm = TRUE)
+```
+
+#### Combine the results into a data frame for better readability
+
+```{r, message=FALSE, warning=FALSE}
+results_stories_Originality_high <- data.frame(
+  Column = names(mean_values),
+  Mean = mean_values,
+  SD = sd_values
+)
+
+print(results_stories_Originality_high)
+View(results_stories_Originality_high)
+```
+
+---
+
+### STORIES HIGH GRANULARITY - Originality (_L_4_high) OVERALL
+
+#### Calculate overall mean and standard deviation for Originality in high stories across all participants
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_large[, grep("_L_4_high$", names(Data_clear_large))] <- 
+  lapply(Data_clear_large[, grep("_L_4_high$", names(Data_clear_large))], 
+         function(x) as.numeric(as.character(x)))
+
+Overall_Mean_Grade_Originality_high <- mean(unlist(Data_clear_large[, grep("_L_4_high$", names(Data_clear_large))]), na.rm = TRUE)
+Overall_SD_Grade_Originality_high <- sd(unlist(Data_clear_large[, grep("_L_4_high$", names(Data_clear_large))]), na.rm = TRUE)
+
+overall_results_Originality_high <- list(
+  Overall_Mean_Grade = Overall_Mean_Grade_Originality_high,
+  Overall_SD_Grade = Overall_SD_Grade_Originality_high
+)
+
+print(overall_results_Originality_high)
+```
+
+---
+
+### STORIES HIGH GRANULARITY - Engagement (_L_5_high)
+
+#### Select columns that end with "_L_5_high" and convert to numeric
+
+```{r, message=FALSE, warning=FALSE}
+stories_Engagement_high <- Data_clear_large %>%
+  select(ends_with("_L_5_high")) %>%
+  mutate(across(everything(), ~ as.numeric(as.character(.))))
+```
+
+#### Check for any NA values introduced by coercion
+
+```{r, message=FALSE, warning=FALSE}
+na_count <- sum(is.na(stories_Engagement_high))
+if (na_count > 0) {
+  cat("Warning: NA values were introduced during conversion. Count:", na_count, "\n")
+}
+```
+
+#### Calculate mean and SD for each column ending with "_L_5_high"
+
+```{r, message=FALSE, warning=FALSE}
+mean_values <- colMeans(stories_Engagement_high, na.rm = TRUE)
+sd_values <- apply(stories_Engagement_high, 2, sd, na.rm = TRUE)
+```
+
+#### Combine the results into a data frame for better readability
+
+```{r, message=FALSE, warning=FALSE}
+results_stories_Engagement_high <- data.frame(
+  Column = names(mean_values),
+  Mean = mean_values,
+  SD = sd_values
+)
+
+print(results_stories_Engagement_high)
+View(results_stories_Engagement_high)
+```
+
+---
+
+### STORIES HIGH GRANULARITY - Engagement (_L_5_high) OVERALL
+
+#### Calculate overall mean and standard deviation for Engagement in high stories across all participants
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_large[, grep("_L_5_high$", names(Data_clear_large))] <- 
+  lapply(Data_clear_large[, grep("_L_5_high$", names(Data_clear_large))], 
+         function(x) as.numeric(as.character(x)))
+
+Overall_Mean_Grade_Engagement_high <- mean(unlist(Data_clear_large[, grep("_L_5_high$", names(Data_clear_large))]), na.rm = TRUE)
+Overall_SD_Grade_Engagement_high <- sd(unlist(Data_clear_large[, grep("_L_5_high$", names(Data_clear_large))]), na.rm = TRUE)
+
+overall_results_Engagement_high <- list(
+  Overall_Mean_Grade = Overall_Mean_Grade_Engagement_high,
+  Overall_SD_Grade = Overall_SD_Grade_Engagement_high
+)
+
+print(overall_results_Engagement_high)
+```
+
+---
+
+### STORIES LOW GRANULARITY - Entertainment (_L_1_low)
+
+#### Select columns that end with "_L_1_low" and convert to numeric
+
+```{r, message=FALSE, warning=FALSE}
+stories_Entertainment_low <- Data_clear_large %>%
+  select(ends_with("_L_1_low")) %>%
+  mutate(across(everything(), ~ as.numeric(as.character(.))))
+```
+
+#### Check for any NA values introduced by coercion
+
+```{r, message=FALSE, warning=FALSE}
+na_count <- sum(is.na(stories_Entertainment_low))
+if (na_count > 0) {
+  cat("Warning: NA values were introduced during conversion. Count:", na_count, "\n")
+}
+```
+
+#### Calculate mean and SD for each column ending with "\_L_1\_low"
+
+```{r, message=FALSE, warning=FALSE}
+mean_values <- colMeans(stories_Entertainment_low, na.rm = TRUE)
+sd_values <- apply(stories_Entertainment_low, 2, sd, na.rm = TRUE)
+```
+
+#### Combine the results into a data frame for better readability
+
+```{r, message=FALSE, warning=FALSE}
+results_stories_Entertainment_low <- data.frame(
+  Column = names(mean_values),
+  Mean = mean_values,
+  SD = sd_values
+)
+
+print(results_stories_Entertainment_low)
+View(results_stories_Entertainment_low)
+```
+
+---
+
+### STORIES LOW GRANULARITY - Entertainment (_L_1_low) OVERALL
+
+#### Calculate overall mean and standard deviation for Entertainment in low stories across all participants
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_large[, grep("_L_1_low$", names(Data_clear_large))] <- 
+  lapply(Data_clear_large[, grep("_L_1_low$", names(Data_clear_large))], 
+         function(x) as.numeric(as.character(x)))
+
+Overall_Mean_Grade_Entertainment_low <- mean(unlist(Data_clear_large[, grep("_L_1_low$", names(Data_clear_large))]), na.rm = TRUE)
+Overall_SD_Grade_Entertainment_low <- sd(unlist(Data_clear_large[, grep("_L_1_low$", names(Data_clear_large))]), na.rm = TRUE)
+
+overall_results_Entertainment_low <- list(
+  Overall_Mean_Grade = Overall_Mean_Grade_Entertainment_low,
+  Overall_SD_Grade = Overall_SD_Grade_Entertainment_low
+)
+
+print(overall_results_Entertainment_low)
+```
+
+---
+
+### STORIES LOW GRANULARITY - Emotionality (_L_2_low)
+
+#### Select columns that end with "_L_2_high" and convert to numeric
+
+```{r, message=FALSE, warning=FALSE}
+stories_Emotionality_low <- Data_clear_large %>%
+  select(ends_with("_L_2_low")) %>%
+  mutate(across(everything(), ~ as.numeric(as.character(.))))
+```
+
+#### Check for any NA values introduced by coercion
+
+```{r, message=FALSE, warning=FALSE}
+na_count <- sum(is.na(stories_Emotionality_low))
+if (na_count > 0) {
+  cat("Warning: NA values were introduced during conversion. Count:", na_count, "\n")
+}
+```
+
+#### Calculate mean and SD for each column ending with "_L_2_low"
+
+```{r, message=FALSE, warning=FALSE}
+mean_values <- colMeans(stories_Emotionality_low, na.rm = TRUE)
+sd_values <- apply(stories_Emotionality_low, 2, sd, na.rm = TRUE)
+```
+
+#### Combine the results into a data frame for better readability
+
+```{r, message=FALSE, warning=FALSE}
+results_stories_Emotionality_low <- data.frame(
+  Column = names(mean_values),
+  Mean = mean_values,
+  SD = sd_values
+)
+
+print(results_stories_Emotionality_low)
+View(results_stories_Emotionality_low)
+```
+
+---
+
+### STORIES LOW GRANULARITY - Emotionality (_L_2_low) OVERALL
+
+#### Calculate overall mean and standard deviation for Emotionality in low stories across all participants
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_large[, grep("_L_2_low$", names(Data_clear_large))] <- 
+  lapply(Data_clear_large[, grep("_L_2_low$", names(Data_clear_large))], 
+         function(x) as.numeric(as.character(x)))
+
+Overall_Mean_Grade_Emotionality_low <- mean(unlist(Data_clear_large[, grep("_L_2_low$", names(Data_clear_large))]), na.rm = TRUE)
+Overall_SD_Grade_Emotionality_low <- sd(unlist(Data_clear_large[, grep("_L_2_low$", names(Data_clear_large))]), na.rm = TRUE)
+
+overall_results_Emotionality_low <- list(
+  Overall_Mean_Grade = Overall_Mean_Grade_Emotionality_low,
+  Overall_SD_Grade = Overall_SD_Grade_Emotionality_low
+)
+
+print(overall_results_Emotionality_low)
+```
+
+---
+
+### STORIES LOW GRANULARITY - Memorable (_L_3_low)
+
+#### Select columns that end with "_L_3_low" and convert to numeric
+
+```{r, message=FALSE, warning=FALSE}
+stories_Memorable_low <- Data_clear_large %>%
+  select(ends_with("_L_3_low")) %>%
+  mutate(across(everything(), ~ as.numeric(as.character(.))))
+```
+
+#### Check for any NA values introduced by coercion
+
+```{r, message=FALSE, warning=FALSE}
+na_count <- sum(is.na(stories_Memorable_low))
+if (na_count > 0) {
+  cat("Warning: NA values were introduced during conversion. Count:", na_count, "\n")
+}
+```
+
+#### Calculate mean and SD for each column ending with "_L_3_low"
+
+```{r, message=FALSE, warning=FALSE}
+mean_values <- colMeans(stories_Memorable_low, na.rm = TRUE)
+sd_values <- apply(stories_Memorable_low, 2, sd, na.rm = TRUE)
+```
+
+#### Combine the results into a data frame for better readability
+
+```{r, message=FALSE, warning=FALSE}
+results_stories_Memorable_low <- data.frame(
+  Column = names(mean_values),
+  Mean = mean_values,
+  SD = sd_values
+)
+
+print(results_stories_Memorable_low)
+View(results_stories_Memorable_low)
+```
+
+---
+
+### STORIES LOW GRANULARITY - Memorable (_L_3_low) OVERALL
+
+#### Calculate overall mean and standard deviation for Memorable in low stories across all participants
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_large[, grep("_L_3_low$", names(Data_clear_large))] <- 
+  lapply(Data_clear_large[, grep("_L_3_low$", names(Data_clear_large))], 
+         function(x) as.numeric(as.character(x)))
+
+Overall_Mean_Grade_Memorable_low <- mean(unlist(Data_clear_large[, grep("_L_3_low$", names(Data_clear_large))]), na.rm = TRUE)
+Overall_SD_Grade_Memorable_low <- sd(unlist(Data_clear_large[, grep("_L_3_low$", names(Data_clear_large))]), na.rm = TRUE)
+
+overall_results_Memorable_low <- list(
+  Overall_Mean_Grade = Overall_Mean_Grade_Memorable_low,
+  Overall_SD_Grade = Overall_SD_Grade_Memorable_low
+)
+
+print(overall_results_Memorable_low)
+```
+
+---
+
+### STORIES LOW GRANULARITY - Originality (_L_4_low)
+
+#### Select columns that end with "_L_4_low" and convert to numeric
+
+```{r, message=FALSE, warning=FALSE}
+stories_Originality_low <- Data_clear_large %>%
+  select(ends_with("_L_4_low")) %>%
+  mutate(across(everything(), ~ as.numeric(as.character(.))))
+```
+
+#### Check for any NA values introduced by coercion
+
+```{r, message=FALSE, warning=FALSE}
+na_count <- sum(is.na(stories_Originality_low))
+if (na_count > 0) {
+  cat("Warning: NA values were introduced during conversion. Count:", na_count, "\n")
+}
+```
+
+#### Calculate mean and SD for each column ending with "_L_4_low"
+
+```{r, message=FALSE, warning=FALSE}
+mean_values <- colMeans(stories_Originality_low, na.rm = TRUE)
+sd_values <- apply(stories_Originality_low, 2, sd, na.rm = TRUE)
+```
+
+#### Combine the results into a data frame for better readability
+
+```{r, message=FALSE, warning=FALSE}
+results_stories_Originality_low <- data.frame(
+  Column = names(mean_values),
+  Mean = mean_values,
+  SD = sd_values
+)
+
+print(results_stories_Originality_low)
+View(results_stories_Originality_low)
+```
+
+---
+
+### STORIES LOW GRANULARITY - Originality (_L_4_low) OVERALL
+
+#### Calculate overall mean and standard deviation for Originality in low stories across all participants
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_large[, grep("_L_4_low$", names(Data_clear_large))] <- 
+  lapply(Data_clear_large[, grep("_L_4_low$", names(Data_clear_large))], 
+         function(x) as.numeric(as.character(x)))
+
+Overall_Mean_Grade_Originality_low <- mean(unlist(Data_clear_large[, grep("_L_4_low$", names(Data_clear_large))]), na.rm = TRUE)
+Overall_SD_Grade_Originality_low <- sd(unlist(Data_clear_large[, grep("_L_4_low$", names(Data_clear_large))]), na.rm = TRUE)
+
+overall_results_Originality_low <- list(
+  Overall_Mean_Grade = Overall_Mean_Grade_Originality_low,
+  Overall_SD_Grade = Overall_SD_Grade_Originality_low
+)
+
+print(overall_results_Originality_low)
+```
+
+---
+
+### STORIES LOW GRANULARITY - Engagement (_L_5_low)
+
+#### Select columns that end with "_L_5_low" and convert to numeric
+
+```{r, message=FALSE, warning=FALSE}
+stories_Engagement_low <- Data_clear_large %>%
+  select(ends_with("_L_5_low")) %>%
+  mutate(across(everything(), ~ as.numeric(as.character(.))))
+```
+
+#### Check for any NA values introduced by coercion
+
+```{r, message=FALSE, warning=FALSE}
+na_count <- sum(is.na(stories_Engagement_low))
+if (na_count > 0) {
+  cat("Warning: NA values were introduced during conversion. Count:", na_count, "\n")
+}
+```
+
+#### Calculate mean and SD for each column ending with "_L_5_low"
+
+```{r, message=FALSE, warning=FALSE}
+mean_values <- colMeans(stories_Engagement_low, na.rm = TRUE)
+sd_values <- apply(stories_Engagement_low, 2, sd, na.rm = TRUE)
+```
+
+#### Combine the results into a data frame for better readability
+
+```{r, message=FALSE, warning=FALSE}
+results_stories_Engagement_low <- data.frame(
+  Column = names(mean_values),
+  Mean = mean_values,
+  SD = sd_values
+)
+
+print(results_stories_Engagement_low)
+View(results_stories_Engagement_low)
+```
+
+---
+
+### STORIES LOW GRANULARITY - Engagement (_L_5_low) OVERALL
+
+#### Calculate overall mean and standard deviation for Engagement in low stories across all participants
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_large[, grep("_L_5_low$", names(Data_clear_large))] <- 
+  lapply(Data_clear_large[, grep("_L_5_low$", names(Data_clear_large))], 
+         function(x) as.numeric(as.character(x)))
+
+Overall_Mean_Grade_Engagement_low <- mean(unlist(Data_clear_large[, grep("_L_5_low$", names(Data_clear_large))]), na.rm = TRUE)
+Overall_SD_Grade_Engagement_low <- sd(unlist(Data_clear_large[, grep("_L_5_low$", names(Data_clear_large))]), na.rm = TRUE)
+
+overall_results_Engagement_low <- list(
+  Overall_Mean_Grade = Overall_Mean_Grade_Engagement_low,
+  Overall_SD_Grade = Overall_SD_Grade_Engagement_low
+)
+
+print(overall_results_Engagement_low)
+```
+
+\newpage
+
+## 3. Comparisons
+
+### Comparison between OVERALL grades HIGH STORIES and LOW STORIES
+
+```{r, message=FALSE, warning=FALSE}
+comparison_results_overall_highvslow <- data.frame(
+  Story_Type = c("High Stories", "Low Stories"),
+  Overall_Mean_Grade = c(overall_results_high_stories$Overall_Mean_Grade, 
+                         overall_results_low_stories$Overall_Mean_Grade),
+  Overall_SD_Grade = c(overall_results_high_stories$Overall_SD_Grade, 
+                       overall_results_low_stories$Overall_SD_Grade)
+)
+```
+
+#### Create the bar plot comparing overall mean grades
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(comparison_results_overall_highvslow, aes(x = Story_Type, y = Overall_Mean_Grade, fill = Story_Type)) +
+  geom_bar(stat = "identity", position = position_dodge(), width = 0.7) +
+  geom_errorbar(aes(ymin = Overall_Mean_Grade - Overall_SD_Grade, 
+                    ymax = Overall_Mean_Grade + Overall_SD_Grade), 
+                width = 0.2, position = position_dodge(0.7)) +
+  labs(title = "Comparison of Overall Mean Grades for High and Low Stories",
+       x = "Story Type",
+       y = "Overall Mean Grade") +
+  theme_minimal()
+```
+
+---
+
+### Comparison between OVERALL ENTERTAINMENT grades HIGH STORIES and LOW STORIES
+
+```{r, message=FALSE, warning=FALSE}
+comparison_results_overall_Entertainment_highvslow <- data.frame(
+  Story_Type = c("High Stories", "Low Stories"),
+  Overall_Mean_Grade = c(overall_results_Entertainment_high$Overall_Mean_Grade, 
+                         overall_results_Entertainment_low$Overall_Mean_Grade),
+  Overall_SD_Grade = c(overall_results_Entertainment_high$Overall_SD_Grade, 
+                       overall_results_Entertainment_low$Overall_SD_Grade)
+)
+```
+
+#### Create the bar plot comparing overall mean grades for Entertainment
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(comparison_results_overall_Entertainment_highvslow, aes(x = Story_Type, y = Overall_Mean_Grade, fill = Story_Type)) +
+  geom_bar(stat = "identity", position = position_dodge(), width = 0.7) +
+  geom_errorbar(aes(ymin = Overall_Mean_Grade - Overall_SD_Grade, 
+                    ymax = Overall_Mean_Grade + Overall_SD_Grade), 
+                width = 0.2, position = position_dodge(0.7)) +
+  labs(title = "Comparison of Overall Mean Grades for Entertainment for High and Low Stories",
+       x = "Story Type",
+       y = "Overall Mean Grade Entertainment") +
+  theme_minimal()
+
+View(comparison_results_overall_Entertainment_highvslow)
+```
+
+---
+
+### Comparison between OVERALL EMOTIONALITY grades HIGH STORIES and LOW STORIES
+
+```{r, message=FALSE, warning=FALSE}
+comparison_results_overall_Emotionality_highvslow <- data.frame(
+  Story_Type = c("High Stories", "Low Stories"),
+  Overall_Mean_Grade = c(overall_results_Emotionality_high$Overall_Mean_Grade, 
+                         overall_results_Emotionality_low$Overall_Mean_Grade),
+  Overall_SD_Grade = c(overall_results_Emotionality_high$Overall_SD_Grade, 
+                       overall_results_Emotionality_low$Overall_SD_Grade)
+)
+```
+
+#### Create the bar plot comparing overall mean grades for Emotionality
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(comparison_results_overall_Emotionality_highvslow, aes(x = Story_Type, y = Overall_Mean_Grade, fill = Story_Type)) +
+  geom_bar(stat = "identity", position = position_dodge(), width = 0.7) +
+  geom_errorbar(aes(ymin = Overall_Mean_Grade - Overall_SD_Grade, 
+                    ymax = Overall_Mean_Grade + Overall_SD_Grade), 
+                width = 0.2, position = position_dodge(0.7)) +
+  labs(title = "Comparison of Overall Mean Grades for Emotionality for High and Low Stories",
+       x = "Story Type",
+       y = "Overall Mean Grade Emotionality") +
+  theme_minimal()
+```
+
+---
+
+### Comparison between OVERALL MEMORABLE grades HIGH STORIES and LOW STORIES
+
+```{r, message=FALSE, warning=FALSE}
+comparison_results_overall_Memorable_highvslow <- data.frame(
+  Story_Type = c("High Stories", "Low Stories"),
+  Overall_Mean_Grade = c(overall_results_Memorable_high$Overall_Mean_Grade, 
+                         overall_results_Memorable_low$Overall_Mean_Grade),
+  Overall_SD_Grade = c(overall_results_Memorable_high$Overall_SD_Grade, 
+                       overall_results_Memorable_low$Overall_SD_Grade)
+)
+```
+
+#### Create the bar plot comparing overall mean grades for Emotionality
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(comparison_results_overall_Memorable_highvslow, aes(x = Story_Type, y = Overall_Mean_Grade, fill = Story_Type)) +
+  geom_bar(stat = "identity", position = position_dodge(), width = 0.7) +
+  geom_errorbar(aes(ymin = Overall_Mean_Grade - Overall_SD_Grade, 
+                    ymax = Overall_Mean_Grade + Overall_SD_Grade), 
+                width = 0.2, position = position_dodge(0.7)) +
+  labs(title = "Comparison of Overall Mean Grades for Memorable for High and Low Stories",
+       x = "Story Type",
+       y = "Overall Mean Grade Memorable") +
+  theme_minimal()
+```
+
+---
+
+### Comparison between OVERALL ORIGINALITY grades HIGH STORIES and LOW STORIES
+
+```{r, message=FALSE, warning=FALSE}
+comparison_results_overall_Originality_highvslow <- data.frame(
+  Story_Type = c("High Stories", "Low Stories"),
+  Overall_Mean_Grade = c(overall_results_Originality_high$Overall_Mean_Grade, 
+                         overall_results_Originality_low$Overall_Mean_Grade),
+  Overall_SD_Grade = c(overall_results_Originality_high$Overall_SD_Grade, 
+                       overall_results_Originality_low$Overall_SD_Grade)
+)
+```
+
+#### Create the bar plot comparing overall mean grades for Emotionality
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(comparison_results_overall_Originality_highvslow, aes(x = Story_Type, y = Overall_Mean_Grade, fill = Story_Type)) +
+  geom_bar(stat = "identity", position = position_dodge(), width = 0.7) +
+  geom_errorbar(aes(ymin = Overall_Mean_Grade - Overall_SD_Grade, 
+                    ymax = Overall_Mean_Grade + Overall_SD_Grade), 
+                width = 0.2, position = position_dodge(0.7)) +
+  labs(title = "Comparison of Overall Mean Grades for Originality for High and Low Stories",
+       x = "Story Type",
+       y = "Overall Mean Grade Originality") +
+  theme_minimal()
+```
+
+---
+
+### Comparison between OVERALL ENGAGEMENT grades HIGH STORIES and LOW STORIES
+
+```{r, message=FALSE, warning=FALSE}
+comparison_results_overall_Engagement_highvslow <- data.frame(
+  Story_Type = c("High Stories", "Low Stories"),
+  Overall_Mean_Grade = c(overall_results_Engagement_high$Overall_Mean_Grade, 
+                         overall_results_Engagement_low$Overall_Mean_Grade),
+  Overall_SD_Grade = c(overall_results_Engagement_high$Overall_SD_Grade, 
+                       overall_results_Engagement_low$Overall_SD_Grade)
+)
+```
+
+#### Create the bar plot comparing overall mean grades for Emotionality
+
+```{r, message=FALSE, warning=FALSE}
+ggplot(comparison_results_overall_Engagement_highvslow, aes(x = Story_Type, y = Overall_Mean_Grade, fill = Story_Type)) +
+  geom_bar(stat = "identity", position = position_dodge(), width = 0.7) +
+  geom_errorbar(aes(ymin = Overall_Mean_Grade - Overall_SD_Grade, 
+                    ymax = Overall_Mean_Grade + Overall_SD_Grade), 
+                width = 0.2, position = position_dodge(0.7)) +
+  labs(title = "Comparison of Overall Mean Grades for Engagement for High and Low Stories",
+       x = "Story Type",
+       y = "Overall Mean Grade Engagement") +
+  theme_minimal()
+```
+
+\newpage
+
+## 4. Correlation table
+
+### Correlation table with Grades and Category
+
+```{r, message=FALSE, warning=FALSE}
+correlation_data <- Data_clear_long[, c("Age", "Genre", "Education", "Vie", "Participation", "Grades", "Category")]
+
+correlation_data$Category <- as.numeric(correlation_data$Category)
+correlation_data$Age <- as.numeric(correlation_data$Age)
+correlation_data$Genre <- as.numeric(correlation_data$Genre)
+correlation_data$Education <- as.numeric(correlation_data$Education)
+correlation_data$Vie <- as.numeric(correlation_data$Vie)
+correlation_data$Participation <- as.numeric(correlation_data$Participation)
+correlation_data$Grades <- as.numeric(correlation_data$Grades)
+
+correlation_data <- na.omit(correlation_data)
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+correlation_results = cor(correlation_data)
+print(correlation_results)
+
+correlation_results_pvalue <- rcorr(as.matrix(correlation_data))
+correlation_results_pvalue
+
+correlation_results_pvalue$r
+correlation_results_pvalue$P
+
+correlation_matrix <- correlation_results_pvalue$r
+
+ggcorrplot(correlation_matrix, hc.order = FALSE, type = "lower", lab = TRUE)
+```
+
+```{r, message=FALSE, warning=FALSE}
+tab_corr(correlation_data,
+         triangle = "lower")
+```
+
+---
+
+\newpage
+
+## 5. Distribution
+
+### Distribution of HIGH STORIES GRADES
+
+```{r, message=FALSE, warning=FALSE}
+high_grades_distribution <- Data_clear_large %>%
+  select("high_BEJEDI08_1", "high_MAANAU12_1", "high_SAERBE09_1", "high_SADJSO02_1")
+
+par(mfrow = c(2, 2))
+for (col in names(high_grades_distribution)) {
+  hist(high_grades_distribution[[col]], breaks = 10, main = paste("Histogram of", col), xlab = "Grades", col = "lightblue")
+}
+```
+
+```{r, message=FALSE, warning=FALSE}
+summary_stats_high_grades <- summary(high_grades_distribution)
+print(summary_stats_high_grades)
+```
+
+#### Shapiro-Wilk normality test
+
+```{r, message=FALSE, warning=FALSE}
+shapiro_results_high_grades <- lapply(high_grades_distribution, shapiro.test)
+
+shapiro_results_high_grades
+
+# Higher than 0.05 = normally distributed
+# BEJEDI08 and SADJSO02 are NOT normally distributed
+```
+
+---
+
+### Distribution of LOW STORIES GRADES
+
+```{r, message=FALSE, warning=FALSE}
+low_grades_distribution <- Data_clear_large %>%
+  select("low_ANJETI02_1", "low_CLCHJO01_1", "low_COHEIG03_1", "low_VEYVEM11_1")
+
+par(mfrow = c(2, 2))
+for (col in names(low_grades_distribution)) {
+  hist(low_grades_distribution[[col]], breaks = 10, main = paste("Histogram of", col), xlab = "Grades", col = "lightblue")
+}
+```
+
+```{r, message=FALSE, warning=FALSE}
+summary_stats_low_grades <- summary(low_grades_distribution)
+print(summary_stats_low_grades)
+```
+
+#### Shapiro-Wilk normality test
+
+```{r, message=FALSE, warning=FALSE}
+shapiro_results_low_grades <- lapply(low_grades_distribution, shapiro.test)
+
+shapiro_results_low_grades
+
+# Higher than 0.05 = normally distributed
+# COHEIG03 is NOT normally distributed
+```
+
+---
+
+### Distribution of Exploratory questions
+
+```{r, message=FALSE, warning=FALSE}
+grades_distribution_Exploration <- Data_clear_large %>%
+  select(matches("_high$|_low$"))
+
+par(mfrow = c(2, 2))
+for (col in names(grades_distribution_Exploration)) {
+  hist(grades_distribution_Exploration[[col]], breaks = 10, main = paste("Histogram of", col), xlab = "Grades", col = "lightblue")
+}
+```
+
+```{r, message=FALSE, warning=FALSE}
+summary_stats_grades_Exploration <- summary(grades_distribution_Exploration)
+print(summary_stats_grades_Exploration)
+```
+
+#### Shapiro-Wilk normality test
+
+```{r, message=FALSE, warning=FALSE}
+shapiro_results_grades_Exploration <- lapply(grades_distribution_Exploration, shapiro.test)
+
+shapiro_results_grades_Exploration
+
+# Higher than 0.05 = normally distributed
+# BEJEDI08_L_1_high, BEJEDI08_L_4_high, MAANAU12_L_1_high, MAANAU12_L_5_high, ANJETI02_L_1_low, CLCHJO01_L_2_low, SAERBE09_L_1_high, SAERBE09_L_2_high, SAERBE09_L_3_high, SADJSO02_L_2_high, COHEIG03_L_4_low, VEYVEM11_L_1_low and VEYVEM11_L_4_low are NOT NORMALLY DISTRIBUTED
+```
+
+## 6.Mann-Whitney U Test
+
+### Mann-Whitney U Test for every participants
+
+```{r, message=FALSE, warning=FALSE}
+high_ratings <- unlist(Data_clear_large %>% select(starts_with("high_")))
+low_ratings <- unlist(Data_clear_large %>% select(starts_with("low_")))
+
+mann_whitney_test <- wilcox.test(high_ratings, low_ratings, paired = TRUE)
+
+print(mann_whitney_test)
+```
+
+### Mann-Whitney U Test for Group A (1) and Group B (2)
+
+```{r, message=FALSE, warning=FALSE}
+groupe_A_data <- Data_clear_large %>% filter(Groupe == 1)
+groupe_B_data <- Data_clear_large %>% filter(Groupe == 2)
+
+# Groupe A (1)
+high_ratings_groupeA<- unlist(groupe_A_data %>% select(starts_with("high_")))
+low_ratings_groupeA <- unlist(groupe_A_data %>% select(starts_with("low_")))
+
+mann_whitney_groupeA <- wilcox.test(high_ratings_groupeA, low_ratings_groupeA, paired = TRUE)
+
+# Groupe B (2)
+high_ratings_groupeB <- unlist(groupe_B_data %>% select(starts_with("high_")))
+low_ratings_groupeB <- unlist(groupe_B_data %>% select(starts_with("low_")))
+mann_whitney_groupeB <- wilcox.test(high_ratings_groupeB, low_ratings_groupeB, paired = TRUE)
+
+# Print results
+print(mann_whitney_groupeA)
+print(mann_whitney_groupeB)
+```
+
+## 7. Linear Mixed_effects Model
+
+### Linear Mixed_effects Model for high and low stories
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long$Grades <- as.numeric(as.character(Data_clear_long$Grades))
+Data_clear_long$Age <- as.numeric(Data_clear_long$Age)
+Data_clear_long$Genre <- as.factor(Data_clear_long$Genre)
+Data_clear_long$Education <- as.factor(Data_clear_long$Education)
+Data_clear_long$Vie <- as.factor(Data_clear_long$Vie)
+Data_clear_long$Participation <- as.factor(Data_clear_long$Participation)
+
+model_grade_category <- lmer(Grades ~ Category + Age + Genre + Education + Vie + Participation + (1 | ResponseId), data = Data_clear_long)
+
+summary(model_grade_category)
+```
+
+### Conclusion for Linear Mixed_effects Model for high and low stories
+
+The model suggests that Category (high vs. low stories) does not have a significant effect on grades, though there is a trend towards low-category stories receiving slightly lower ratings.
+
+Age, Genre, and Vie do not have significant effects on the grades.
+
+Education is the most influential factor, with higher education levels (particularly Education8) associated with lower ratings.
+
+Participation does not significantly impact the grades either.
+
+---
+
+### Linear Mixed_effects Model for Entertainment grades
+
+#### Long table for Entertainment grades
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Entertainment <- pivot_longer(
+  Data_clear_large, 
+  cols = ends_with(c("_L_1_high", "_L_1_low")),
+  names_to = "Stories",
+  values_to = "Grades"
+)
+```
+
+#### Move "Question" and "Response" to the first two columns
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Entertainment <- Data_clear_long_Entertainment %>%
+  select(Stories, Grades, everything())
+
+print(Data_clear_long_Entertainment)
+View(Data_clear_long_Entertainment)
+```
+
+#### Add the column "Category" to the dataset
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Entertainment <- Data_clear_long_Entertainment %>%
+  mutate(
+    Category = case_when(
+      grepl("(exp_high_BEJEDI08|exp_high_MAANAU12|exp_high_SADJSO02|exp_high_SAERBE09)", Stories) ~ "high",
+      grepl("^(exp_low_VEYVEM11|exp_low_CLCHJO01|exp_low_ANJETI02|exp_low_COHEIG03)", Stories) ~ "low",
+    )
+  )%>%
+  select(1:2, Category, everything())  # Moves Category to the 3rd position
+
+Data_clear_long_Entertainment$Category<- as.factor(Data_clear_long_Entertainment$Category)
+Data_clear_long_Entertainment$Grades <- as.numeric(as.character(Data_clear_long_Entertainment$Grades))
+Data_clear_long_Entertainment$Age <- as.numeric(Data_clear_long_Entertainment$Age)
+Data_clear_long_Entertainment$Genre <- as.factor(Data_clear_long_Entertainment$Genre)
+Data_clear_long_Entertainment$Education <- as.factor(Data_clear_long_Entertainment$Education)
+Data_clear_long_Entertainment$Vie <- as.factor(Data_clear_long_Entertainment$Vie)
+Data_clear_long_Entertainment$Participation <- as.factor(Data_clear_long_Entertainment$Participation)
+
+View(Data_clear_long_Entertainment)
+```
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Entertainment$Grades <- as.numeric(as.character(Data_clear_long_Entertainment$Grades))
+
+model_Entertainment_category <- lmer(Grades ~ Category + Age + Genre + Education + Vie + Participation + (1 | ResponseId), data = Data_clear_long_Entertainment)
+
+summary(model_Entertainment_category)
+```
+
+### Conclusion of Linear Mixed_effects Model for Entertainment grades
+
+Category (high vs. low stories) has a marginally significant effect on entertainment ratings, with low-category stories receiving slightly lower ratings.
+
+Age, Genre, Education, Vie, and Participation do not have significant effects on the grade given by participants to the entertainment question.
+
+The Education variable shows a trend where participants with higher education levels tend to rate the entertainment value of the stories lower, but these effects are not statistically significant.
+
+Overall, the model suggests that factors like age, genre, education, and participation do not strongly influence entertainment ratings, but the Category of the story (high vs. low) may have a small impact.
+
+---
+
+### Linear Mixed_effects Model for Emotionality grades
+
+#### Long table for Emotional grades
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Emotionality <- pivot_longer(
+  Data_clear_large, 
+  cols = ends_with(c("_L_2_high", "_L_2_low")),
+  names_to = "Stories",
+  values_to = "Grades"
+)
+```
+
+#### Move "Question" and "Response" to the first two columns
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Emotionality <- Data_clear_long_Emotionality %>%
+  select(Stories, Grades, everything())
+
+print(Data_clear_long_Emotionality)
+View(Data_clear_long_Emotionality)
+```
+
+#### Add the column "Category" to the dataset
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Emotionality <- Data_clear_long_Emotionality %>%
+  mutate(
+    Category = case_when(
+      grepl("(exp_high_BEJEDI08|exp_high_MAANAU12|exp_high_SADJSO02|exp_high_SAERBE09)", Stories) ~ "high",
+      grepl("^(exp_low_VEYVEM11|exp_low_CLCHJO01|exp_low_ANJETI02|exp_low_COHEIG03)", Stories) ~ "low",
+    )
+  )%>%
+  select(1:2, Category, everything())  # Moves Category to the 3rd position
+
+Data_clear_long_Emotionality$Category<- as.factor(Data_clear_long_Emotionality$Category)
+Data_clear_long_Emotionality$Grades <- as.numeric(as.character(Data_clear_long_Emotionality$Grades))
+Data_clear_long_Emotionality$Age <- as.numeric(Data_clear_long_Emotionality$Age)
+Data_clear_long_Emotionality$Genre <- as.factor(Data_clear_long_Emotionality$Genre)
+Data_clear_long_Emotionality$Education <- as.factor(Data_clear_long_Emotionality$Education)
+Data_clear_long_Emotionality$Vie <- as.factor(Data_clear_long_Emotionality$Vie)
+Data_clear_long_Emotionality$Participation <- as.factor(Data_clear_long_Emotionality$Participation)
+
+View(Data_clear_long_Emotionality)
+```
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Emotionality$Grades <- as.numeric(as.character(Data_clear_long_Emotionality$Grades))
+
+model_Emotionality_category <- lmer(Grades ~ Category + Age + Genre + Education + Vie + Participation + (1 | ResponseId), data = Data_clear_long_Emotionality)
+
+summary(model_Emotionality_category)
+```
+
+### Conclusion for  Linear Mixed_effects Model for Emotionality grades
+
+Category (low vs high): The Categorylow effect is negative, suggesting that lower emotionality stories might receive lower ratings, but this is not statistically significant.
+
+Age, Genre, Education, Vie, and Participation: None of these variables show strong, statistically significant effects on emotionality ratings in this model.
+
+---
+
+### Linear Mixed_effects Model for Memorable grades
+
+#### Long table for Memorable grades
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Memorable <- pivot_longer(
+  Data_clear_large, 
+  cols = ends_with(c("_L_3_high", "_L_3_low")),
+  names_to = "Stories",
+  values_to = "Grades"
+)
+```
+
+#### Move "Question" and "Response" to the first two columns
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Memorable <- Data_clear_long_Memorable %>%
+  select(Stories, Grades, everything())
+
+print(Data_clear_long_Memorable)
+View(Data_clear_long_Memorable)
+```
+
+#### Add the column "Category" to the dataset
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Memorable <- Data_clear_long_Memorable %>%
+  mutate(
+    Category = case_when(
+      grepl("(exp_high_BEJEDI08|exp_high_MAANAU12|exp_high_SADJSO02|exp_high_SAERBE09)", Stories) ~ "high",
+      grepl("^(exp_low_VEYVEM11|exp_low_CLCHJO01|exp_low_ANJETI02|exp_low_COHEIG03)", Stories) ~ "low",
+    )
+  )%>%
+  select(1:2, Category, everything())  # Moves Category to the 3rd position
+
+Data_clear_long_Memorable$Category<- as.factor(Data_clear_long_Memorable$Category)
+Data_clear_long_Memorable$Grades <- as.numeric(as.character(Data_clear_long_Memorable$Grades))
+Data_clear_long_Memorable$Age <- as.numeric(Data_clear_long_Memorable$Age)
+Data_clear_long_Memorable$Genre <- as.factor(Data_clear_long_Memorable$Genre)
+Data_clear_long_Memorable$Education <- as.factor(Data_clear_long_Memorable$Education)
+Data_clear_long_Memorable$Vie <- as.factor(Data_clear_long_Memorable$Vie)
+Data_clear_long_Memorable$Participation <- as.factor(Data_clear_long_Memorable$Participation)
+
+View(Data_clear_long_Memorable)
+```
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Memorable$Grades <- as.numeric(as.character(Data_clear_long_Memorable$Grades))
+
+model_Memorable_category <- lmer(Grades ~ Category + Age + Genre + Education + Vie + Participation + (1 | ResponseId), data = Data_clear_long_Memorable)
+
+summary(model_Memorable_category)
+```
+
+### Conclusion for Linear Mixed_effects Model for Memorable grades
+
+Category (low vs high): The significant negative effect for Categorylow (-0.50000) suggests that stories rated as less memorable tend to get lower scores, which is a statistically significant effect.
+
+Age, Genre, Education, Vie, and Participation: None of these factors show strong, statistically significant effects on memorability ratings in this model.
+
+---
+
+### Linear Mixed_effects Model for Originality grades
+
+#### Long table for Originality grades
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Originality <- pivot_longer(
+  Data_clear_large, 
+  cols = ends_with(c("_L_4_high", "_L_4_low")),
+  names_to = "Stories",
+  values_to = "Grades"
+)
+```
+
+#### Move "Question" and "Response" to the first two columns
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Originality <- Data_clear_long_Originality %>%
+  select(Stories, Grades, everything())
+
+print(Data_clear_long_Originality)
+View(Data_clear_long_Originality)
+```
+
+#### Add the column "Category" to the dataset
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Originality <- Data_clear_long_Originality %>%
+  mutate(
+    Category = case_when(
+      grepl("(exp_high_BEJEDI08|exp_high_MAANAU12|exp_high_SADJSO02|exp_high_SAERBE09)", Stories) ~ "high",
+      grepl("^(exp_low_VEYVEM11|exp_low_CLCHJO01|exp_low_ANJETI02|exp_low_COHEIG03)", Stories) ~ "low",
+    )
+  )%>%
+  select(1:2, Category, everything())  # Moves Category to the 3rd position
+
+Data_clear_long_Originality$Category<- as.factor(Data_clear_long_Originality$Category)
+Data_clear_long_Originality$Grades <- as.numeric(as.character(Data_clear_long_Originality$Grades))
+Data_clear_long_Originality$Age <- as.numeric(Data_clear_long_Originality$Age)
+Data_clear_long_Originality$Genre <- as.factor(Data_clear_long_Originality$Genre)
+Data_clear_long_Originality$Education <- as.factor(Data_clear_long_Originality$Education)
+Data_clear_long_Originality$Vie <- as.factor(Data_clear_long_Originality$Vie)
+Data_clear_long_Originality$Participation <- as.factor(Data_clear_long_Originality$Participation)
+
+View(Data_clear_long_Originality)
+```
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Originality$Grades <- as.numeric(as.character(Data_clear_long_Originality$Grades))
+
+model_Originality_category <- lmer(Grades ~ Category + Age + Genre + Education + Vie + Participation + (1 | ResponseId), data = Data_clear_long_Originality)
+
+summary(model_Originality_category)
+```
+
+### Conclusion for Linear Mixed_effects Model for Originality grades
+
+Category (low vs. high originality): The Categorylow variable has a marginally significant effect. Low stories are rated lower in originality compared to high stories, but the effect is just on the edge of statistical significance with a t-value of -1.912.
+
+Age, Genre, Education, Vie, and Participation: None of these factors show strong, statistically significant effects on originality ratings.
+
+---
+
+### Linear Mixed_effects Model for Engagement grades
+
+#### Long table for Engagement grades
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Engagement <- pivot_longer(
+  Data_clear_large, 
+  cols = ends_with(c("_L_5_high", "_L_5_low")),
+  names_to = "Stories",
+  values_to = "Grades"
+)
+```
+
+#### Move "Question" and "Response" to the first two columns
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Engagement <- Data_clear_long_Engagement %>%
+  select(Stories, Grades, everything())
+
+print(Data_clear_long_Engagement)
+View(Data_clear_long_Engagement)
+```
+
+#### Add the column "Category" to the dataset
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Engagement <- Data_clear_long_Engagement %>%
+  mutate(
+    Category = case_when(
+      grepl("(exp_high_BEJEDI08|exp_high_MAANAU12|exp_high_SADJSO02|exp_high_SAERBE09)", Stories) ~ "high",
+      grepl("^(exp_low_VEYVEM11|exp_low_CLCHJO01|exp_low_ANJETI02|exp_low_COHEIG03)", Stories) ~ "low",
+    )
+  )%>%
+  select(1:2, Category, everything())  # Moves Category to the 3rd position
+
+Data_clear_long_Engagement$Category<- as.factor(Data_clear_long_Engagement$Category)
+Data_clear_long_Engagement$Grades <- as.numeric(as.character(Data_clear_long_Engagement$Grades))
+Data_clear_long_Engagement$Age <- as.numeric(Data_clear_long_Engagement$Age)
+Data_clear_long_Engagement$Genre <- as.factor(Data_clear_long_Engagement$Genre)
+Data_clear_long_Engagement$Education <- as.factor(Data_clear_long_Engagement$Education)
+Data_clear_long_Engagement$Vie <- as.factor(Data_clear_long_Engagement$Vie)
+Data_clear_long_Engagement$Participation <- as.factor(Data_clear_long_Engagement$Participation)
+
+View(Data_clear_long_Engagement)
+```
+
+```{r, message=FALSE, warning=FALSE}
+Data_clear_long_Engagement$Grades <- as.numeric(as.character(Data_clear_long_Engagement$Grades))
+
+model_Engagement_category <- lmer(Grades ~ Category + Age + Genre + Education + Vie + Participation + (1 | ResponseId), data = Data_clear_long_Engagement)
+
+summary(model_Engagement_category)
+```
+
+### Conclusion for Linear Mixed_effects Model for Engagement grades
+
+Category (low vs. high engagement): The Categorylow variable has a borderline significant effect on engagement, suggesting that low stories tend to be rated lower for engagement than high stories. However, the effect is not very strong, with a t-value close to the threshold for statistical significance.
+
+Age, Genre, Education, Vie, and Participation: None of these predictors show strong, statistically significant effects on engagement ratings.
+
+## 8. Common story
+
+```{r, message=FALSE, warning=FALSE}
+# Merge the columns that start with "RIRO12_1" and so on
+Data_clear_large <- Data_clear_large %>%
+  mutate(RIRO12_1 = coalesce(select(., starts_with("RIRO12_1"))[[1]], select(., starts_with("RIRO12_1"))[[2]]))
+
+Data_clear_large <- Data_clear_large %>%
+  mutate(RIRO12_L_1 = coalesce(select(., starts_with("RIRO12_L_1"))[[1]], select(., starts_with("RIRO12_L_1"))[[2]]))
+
+Data_clear_large <- Data_clear_large %>%
+  mutate(RIRO12_L_2 = coalesce(select(., starts_with("RIRO12_L_2"))[[1]], select(., starts_with("RIRO12_L_2"))[[2]]))
+
+Data_clear_large <- Data_clear_large %>%
+  mutate(RIRO12_L_3 = coalesce(select(., starts_with("RIRO12_L_3"))[[1]], select(., starts_with("RIRO12_L_3"))[[2]]))
+
+Data_clear_large <- Data_clear_large %>%
+  mutate(RIRO12_L_4 = coalesce(select(., starts_with("RIRO12_L_4"))[[1]], select(., starts_with("RIRO12_L_4"))[[2]]))
+
+Data_clear_large <- Data_clear_large %>%
+  mutate(RIRO12_L_5 = coalesce(select(., starts_with("RIRO12_L_5"))[[1]], select(., starts_with("RIRO12_L_5"))[[2]]))
+
+# View the updated dataset
+head(Data_clear_large)
+
+#Deleting useless columns
+Data_clear_large <- Data_clear_large %>%
+  select(-c(40:45, 70:75))
+```
+
+```{r, message=FALSE, warning=FALSE}
+common_story_distribution <- Data_clear_large %>%
+  select(starts_with("RIRO12"))
+
+par(mfrow = c(2, 2))
+for (col in names(common_story_distribution)) {
+  hist(common_story_distribution[[col]], breaks = 10, main = paste("Histogram of", col), xlab = "Grades", col = "lightblue")
+}
+```
+```{r, message=FALSE, warning=FALSE}
+shapiro_results_common_story <- lapply(common_story_distribution, shapiro.test)
+
+shapiro_results_common_story
+
+# Higher than 0.05 = normally distributed
+```
+
+```{r, message=FALSE, warning=FALSE}
+# Calculate the variance of the grades
+variance_riro12 <- var(Data_clear_large$RIRO12_1)
+print(variance_riro12)
+
+```
