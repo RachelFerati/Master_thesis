@@ -17,7 +17,7 @@ This repository contains the materials related to my Master thesis in Cognitive 
 - **Description**: These files contain the code and data used for Results analysis
 
 ### Annexes
-- **Stories**: "9 stories.pdf
-- **EMOTAIX scenario**: "EMOTAIX Scenario.pdf
-- **Flyer**: "Experiment flyer - FR.png
+- **Stories**: "9 stories.pdf"
+- **EMOTAIX scenario**: "EMOTAIX Scenario.pdf"
+- **Flyer**: "Experiment flyer - FR.png"
 - **Description**: These files contain the stories used in the experiment, the software to analyze stories, and the flyer used for the distribution of the experiment.
