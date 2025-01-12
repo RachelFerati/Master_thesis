@@ -1,5 +1,6 @@
 # Master thesis in Cognitive Sciences
 Rachel Ferati
+
 University of Neuchâtel
 
 ## Overview
